@@ -16,7 +16,7 @@ requires = [
     'waitress',
     ]
 
-setup(name='pyramid_oauth2_provider',
+setup(name='pyramid oauth2_provider',
       version='0.1',
       description='Oauth2 endpoint for pyramid applications',
       long_description=README,
@@ -40,6 +40,7 @@ setup(name='pyramid_oauth2_provider',
       main = pyramid_oauth2_provider:main
       [console_scripts]
       initialize_pyramid_oauth2_provider_db = pyramid_oauth2_provider.scripts.initializedb:main
+      create_client_credentials = pyramid_oauth2_provider.scripts.create_client_credentials:main
       """,
       )
 
