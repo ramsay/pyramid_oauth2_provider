@@ -16,7 +16,7 @@ requires = [
     'waitress',
     ]
 
-setup(name='pyramid oauth2_provider',
+setup(name='pyramid-oauth2-provider',
       version='0.1',
       description='Oauth2 endpoint for pyramid applications',
       long_description=README,
