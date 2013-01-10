@@ -55,7 +55,5 @@ def main(argv=sys.argv):
         print 'client_secret:', secret
 
 if __name__ == '__main__':
-    import epdb
-    sys.excepthook = epdb.excepthook()
 
     main()
