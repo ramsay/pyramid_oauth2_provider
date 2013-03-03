@@ -39,6 +39,7 @@ from .generators import gen_client_secret
 DBSession = scoped_session(sessionmaker(extension=ZopeTransactionExtension()))
 Base = declarative_base()
 
+
 class Oauth2Client(Base):
     __tablename__ = 'oauth2_provider_clients'
     id = Column(Integer, primary_key=True)
@@ -58,6 +59,7 @@ class Oauth2Client(Base):
     def isRevoked(self):
         return self.revoked
 
+
 class Oauth2RedirectUri(Base):
     __tablename__ = 'oauth2_provider_redirect_uris'
     id = Column(Integer, primary_key=True)
@@ -69,6 +71,7 @@ class Oauth2RedirectUri(Base):
     def __init__(self, client, uri):
         self.client = client
         self.uri = uri
+
 
 class Oauth2Code(Base):
     __tablename__ = 'oauth2_provider_codes'
@@ -96,9 +99,11 @@ class Oauth2Code(Base):
         self.revocation_date = func.now()
 
     def isRevoked(self):
-        if self.creation_date + self.expires_in > func.now():
+        expiry = time.mktime(self.create_date.timetuple()) + self.expires_in
+        if datetime.frometimestamp(expiry) < datetime.utcnow():
             self.revoke()
         return self.revoked
+
 
 class Oauth2Token(Base):
     __tablename__ = 'oauth2_provider_tokens'
