@@ -76,3 +76,14 @@ class InvalidToken(BaseOauth2Error):
     http://tools.ietf.org/html/draft-ietf-oauth-v2-bearer-23#section-3.1
     """
     error_name = 'invalid_token'
+
+class InvalidCode(BaseOauth2Error):
+    """
+    The authorization code provided is expired, revoked, malformed, or
+    invalid for other reasons.  The resource SHOULD respond with the HTTP 401
+    (Unauthorized) status code.  The client MAY request a new authorization
+    code and retry the access token exchange.
+
+    http://tools.ietf.org/html/rfc6749#section-4.1.3
+    """
+    error_name = 'invalid_code'
