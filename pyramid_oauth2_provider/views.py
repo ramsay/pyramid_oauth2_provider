@@ -159,9 +159,27 @@ def handle_authcode(request, client, redirection_uri, state=None):
         urlencode(qparams), '')
     return HTTPFound(location=parts.geturl())
 
+
 def handle_implicit(request, client, redirection_uri, state=None):
-    return HTTPBadRequest(InvalidRequest(error_description='Oauth2 '
-        'response_type "implicit" not supported'))
+    parts = urlparse(redirection_uri.uri)
+    fparams = dict(state=None)
+
+    user_id = authenticated_userid(request)
+    token = Oauth2Token(client, user_id)
+    db.add(token)
+    db.flush()
+
+    fparams['access_token'] = token.access_token
+    fparams['token_type'] = 'bearer'
+    fparams['expires_in'] = token.expires_in
+    if state:
+        fparams['state'] = state
+
+    parts = ParseResult(
+        parts.scheme, parts.netloc, parts.path, parts.params, '',
+        urlencode(fparams))
+    return HTTPFound(location=parts.geturl())
+
 
 @view_config(route_name='oauth2_provider_token', renderer='json',
              permission=NO_PERMISSION_REQUIRED)

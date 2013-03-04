@@ -239,6 +239,7 @@ class TestImplicitGrant(TestCase):
         TestCase.setUp(self)
         self.client = self._create_client()
         self.request = self._create_request()
+        self.config.testing_securitypolicy(self.auth)
 
     def tearDown(self):
         TestCase.tearDown(self)
