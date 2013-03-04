@@ -79,9 +79,15 @@ class TestCase(unittest.TestCase):
         DBSession.remove()
         testing.tearDown()
 
+    @classmethod
+    def tearDownClass(cls):
+        """ Extra DBSession remove"""
+        DBSession.remove()
+
     def getAuthHeader(self, username, password, scheme='Basic'):
         return {'Authorization': '%s %s'
             % (scheme, base64.b64encode('%s:%s' % (username, password)))}
+
 
 class TestAuthorizeEndpoint(TestCase):
     def setUp(self):
@@ -435,3 +441,64 @@ class TestTokenEndpoint(TestCase):
         dbtoken.expires_in = 0
 
         self.failUnlessEqual(dbtoken.isRevoked(), True)
+
+
+class TestAuthcodeExchange(TestCase):
+    def setUp(self):
+        TestCase.setUp(self)
+        self.code = self._create_code()
+        self.request = self._create_request()
+
+    def tearDown(self):
+        TestCase.tearDown(self)
+        self.code = None
+        self.request = None
+
+    def _create_code(self):
+        with transaction.manager:
+            client = Oauth2Client()
+            DBSession.add(client)
+
+            redirect_uri = Oauth2RedirectUri(client, self.redirect_uri)
+            DBSession.add(redirect_uri)
+
+            code = Oauth2Code(client, self.auth)
+            DBSession.add(code)
+
+
+        code = DBSession.query(Oauth2Code).all()[-1]
+        return code
+
+    def _create_request(self):
+        headers = self.getAuthHeader(
+            self.code.client.client_id,
+            self.code.client.client_secret)
+
+        data = {
+            'grant_type': 'code',
+            'authorization_code': self.code.authcode,
+            'client_id': self.code.client.client_id,
+        }
+
+        request = testing.DummyRequest(post=data, headers=headers)
+        request.scheme = 'https'
+
+        return request
+
+    def _process_view(self):
+        with transaction.manager:
+            token = oauth2_token(self.request)
+        return token
+
+    def _validate_token(self, token):
+        self.failUnless(isinstance(token, dict))
+        self.failUnlessEqual(token.get('user_id'), self.auth)
+        self.failUnlessEqual(token.get('expires_in'), 3600)
+        self.failUnlessEqual(token.get('token_type'), 'bearer')
+        self.failUnlessEqual(len(token.get('access_token')), 64)
+        self.failUnlessEqual(len(token.get('refresh_token')), 64)
+        self.failUnlessEqual(len(token), 5)
+
+    def testExchangeToken(self):
+        token = self._process_view()
+        self._validate_token(token)
