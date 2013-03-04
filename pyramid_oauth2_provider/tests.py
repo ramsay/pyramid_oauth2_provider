@@ -475,9 +475,10 @@ class TestAuthcodeExchange(TestCase):
             self.code.client.client_secret)
 
         data = {
-            'grant_type': 'code',
-            'authorization_code': self.code.authcode,
+            'grant_type': 'authorization_code',
+            'code': self.code.authcode,
             'client_id': self.code.client.client_id,
+            'redirect_uri': self.redirect_uri
         }
 
         request = testing.DummyRequest(post=data, headers=headers)
