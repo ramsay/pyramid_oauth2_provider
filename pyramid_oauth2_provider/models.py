@@ -88,9 +88,14 @@ class Oauth2Code(Base):
     client_id = Column(Integer, ForeignKey(Oauth2Client.id))
     client = relationship(Oauth2Client, backref=backref('authcode'))
 
-    def __init__(self, client, user_id):
+    redirect_uri_id = Column(
+        Integer, ForeignKey(Oauth2RedirectUri.id), nullable=True)
+    redirect_uri = relationship("Oauth2RedirectUri")
+
+    def __init__(self, client, user_id, redirect_uri = None):
         self.client = client
         self.user_id = user_id
+        self.redirect_uri = redirect_uri
 
         self.authcode = gen_token(self.client)
 

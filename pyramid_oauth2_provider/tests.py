@@ -462,7 +462,7 @@ class TestAuthcodeExchange(TestCase):
             redirect_uri = Oauth2RedirectUri(client, self.redirect_uri)
             DBSession.add(redirect_uri)
 
-            code = Oauth2Code(client, self.auth)
+            code = Oauth2Code(client, self.auth, redirect_uri)
             DBSession.add(code)
 
 

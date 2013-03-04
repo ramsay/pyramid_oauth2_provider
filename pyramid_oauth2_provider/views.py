@@ -41,6 +41,25 @@ from .jsonerrors import HTTPUnauthorized
 from .jsonerrors import HTTPMethodNotAllowed
 
 
+def validate_redirect_uri(client, uri=None):
+    """
+    This will return the most valid redirect_uri for the client and given
+    uri.
+
+    :param client:
+    :param uri:
+    :return: string|None
+    """
+    redirection_uri = None
+    if len(client.redirect_uris) == 1 and (
+            not uri or uri == client.redirect_uris[0]):
+        redirection_uri = client.redirect_uris[0]
+    elif len(client.redirect_uris) > 0:
+        redirection_uri = db.query(Oauth2RedirectUri) \
+            .filter_by(client_id=client.id, uri=uri).first()
+    return redirection_uri
+
+
 def require_https(handler):
     """
      This check should be taken care of via the authorization policy, but in
@@ -103,14 +122,8 @@ def oauth2_authorize(request):
         return HTTPBadRequest(InvalidRequest(
             error_description='Invalid client credentials'))
 
-    redirect_uri = request.params.get('redirect_uri')
-    redirection_uri = None
-    if len(client.redirect_uris) == 1 and (
-        not redirect_uri or redirect_uri == client.redirect_uris[0]):
-        redirection_uri = client.redirect_uris[0]
-    elif len(client.redirect_uris) > 0:
-        redirection_uri = db.query(Oauth2RedirectUri)\
-            .filter_by(client_id=client.id, uri=redirect_uri).first()
+    redirection_uri = validate_redirect_uri(
+        client, request.params.get('redirect_uri'))
 
     if redirection_uri is None:
         return HTTPBadRequest(InvalidRequest(
@@ -134,7 +147,7 @@ def handle_authcode(request, client, redirection_uri, state=None):
     qparams = dict(parse_qsl(parts.query))
 
     user_id = authenticated_userid(request)
-    auth_code = Oauth2Code(client, user_id)
+    auth_code = Oauth2Code(client, user_id, redirection_uri)
     db.add(auth_code)
     db.flush()
 
@@ -305,11 +318,6 @@ def handle_authcode_exchange(request, client):
         return HTTPBadRequest(InvalidRequest(
             error_description='code field required'))
 
-    if 'redirect_uri' not in request.POST:
-        log.info('redirect_uri field missing')
-        return HTTPBadRequest(InvalidRequest(
-            error_description='redirect_uri field required'))
-
     if 'client_id' not in request.POST:
         return HTTPBadRequest(InvalidRequest(
             error_description='client_id field required'))
@@ -321,10 +329,25 @@ def handle_authcode_exchange(request, client):
         return HTTPUnauthorized(InvalidCode(error_description='Provided '
             'authorization code is not valid.'))
 
+    if auth_code.redirect_uri and 'redirect_uri' not in request.POST:
+        log.info('redirect_uri field missing')
+        return HTTPBadRequest(InvalidRequest(
+            error_description='redirect_uri field required'))
+
+    if 'redirect_uri' in request.POST:
+        redirection_uri = validate_redirect_uri(client, request.POST['redirect_uri'])
+
+        if not redirection_uri or redirection_uri != auth_code.redirect_uri:
+            log.info('redirect_uri field invalid')
+            return HTTPBadRequest(InvalidRequest(
+                error_description='redirect_uri field is invalid'
+            ))
+
     auth_token = Oauth2Token(client, auth_code.user_id)
     db.add(auth_token)
     db.flush()
     return auth_token.asJSON(token_type='bearer')
+
 
 def add_cache_headers(request):
     """
