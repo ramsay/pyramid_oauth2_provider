@@ -233,6 +233,75 @@ class TestAuthorizeEndpoint(TestCase):
         self.failUnless('state' in params)
         self.failUnlessEqual(state_value, params['state'])
 
+
+class TestImplicitGrant(TestCase):
+    def setUp(self):
+        TestCase.setUp(self)
+        self.client = self._create_client()
+        self.request = self._create_request()
+
+    def tearDown(self):
+        TestCase.tearDown(self)
+        self.client = None
+        self.request = None
+
+    def _create_client(self):
+        with transaction.manager:
+            client = Oauth2Client()
+            DBSession.add(client)
+            client_id = client.client_id
+
+            redirect_uri = Oauth2RedirectUri(client, self.redirect_uri)
+            DBSession.add(redirect_uri)
+
+        client = DBSession.query(Oauth2Client).filter_by(
+            client_id=client_id).first()
+        return client
+
+    def _create_request(self):
+        data = {
+            'response_type': 'token',
+            'client_id': self.client.client_id,
+            'redirect_uri': self.redirect_uri,
+            'state': 'test'
+        }
+
+        request = testing.DummyRequest(params=data)
+        request.scheme = 'https'
+
+        return request
+
+    def _process_view(self):
+        with transaction.manager:
+            response = oauth2_authorize(self.request)
+        return response
+
+    def _validate_response(self, response):
+        self.failUnless(isinstance(response, Response))
+        self.failUnlessEqual(response.status_int, 302)
+
+        redirect = urlparse(self.redirect_uri)
+        location = urlparse(response.location)
+        self.failUnlessEqual(location.scheme, redirect.scheme)
+        self.failUnlessEqual(location.hostname, redirect.hostname)
+        self.failUnlessEqual(location.path, redirect.path)
+        self.failUnless(location.fragment)
+
+        params = dict(parse_qsl(location.fragment))
+
+        self.failUnless('access_token' in params)
+        self.failUnlessEqual(params.get('token_type').lower(), 'bearer')
+
+        token = DBSession.query(Oauth2Token).filter_by(
+            access_token=params.get('access_token')).all()
+
+        self.failUnless(len(token) == 1)
+
+    def testImplicitGrant(self):
+        response = self._process_view()
+        self._validate_response(response)
+
+
 class TestTokenEndpoint(TestCase):
     def setUp(self):
         TestCase.setUp(self)
