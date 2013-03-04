@@ -29,6 +29,7 @@ from .models import Oauth2Code
 from .models import Oauth2RedirectUri
 from .models import Oauth2Client
 from .errors import InvalidToken
+from .errors import InvalidCode
 from .errors import InvalidClient
 from .errors import InvalidRequest
 from .errors import UnsupportedGrantType
@@ -232,6 +233,8 @@ def oauth2_token(request):
         resp = handle_password(request, client)
     elif grant_type == 'refresh_token':
         resp = handle_refresh_token(request, client)
+    elif grant_type == 'authorization_code':
+        resp = handle_authcode_exchange(request, client)
     else:
         log.info('invalid grant type: %s' % grant_type)
         return HTTPBadRequest(UnsupportedGrantType(error_description='Only '
@@ -294,6 +297,34 @@ def handle_refresh_token(request, client):
     db.add(new_token)
     db.flush()
     return new_token.asJSON(token_type='bearer')
+
+
+def handle_authcode_exchange(request, client):
+    if 'code' not in request.POST:
+        log.info('code field missing')
+        return HTTPBadRequest(InvalidRequest(
+            error_description='code field required'))
+
+    if 'redirect_uri' not in request.POST:
+        log.info('redirect_uri field missing')
+        return HTTPBadRequest(InvalidRequest(
+            error_description='redirect_uri field required'))
+
+    if 'client_id' not in request.POST:
+        return HTTPBadRequest(InvalidRequest(
+            error_description='client_id field required'))
+
+    auth_code = db.query(Oauth2Code).filter_by(authcode=request.POST['code']).first()
+
+    if not auth_code:
+        log.info('invalid auth_code')
+        return HTTPUnauthorized(InvalidCode(error_description='Provided '
+            'authorization code is not valid.'))
+
+    auth_token = Oauth2Token(client, auth_code.user_id)
+    db.add(auth_token)
+    db.flush()
+    return auth_token.asJSON(token_type='bearer')
 
 def add_cache_headers(request):
     """
